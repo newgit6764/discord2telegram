@@ -180,7 +180,7 @@ async function sendImageToTelegram(imageUrl, caption) {
         return;
     }
     try {
-        const url = 'https://telegram.org' + TELEGRAM_BOT_TOKEN + '/sendPhoto';
+        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`;
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -207,7 +207,7 @@ async function sendToTelegram(text) {
         return;
     }
     try {
-        const url = 'https://telegram.org' + TELEGRAM_BOT_TOKEN + '/sendMessage';
+        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
