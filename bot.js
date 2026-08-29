@@ -8,7 +8,6 @@ const path = require('path');
 // ========================================================
 const config = {};
 
-// 1. Check if a local physical .env file exists on the hard disk (Local Mac fallback)
 try {
     const envPath = path.join(__dirname, '.env');
     if (fs.existsSync(envPath)) {
@@ -29,7 +28,6 @@ try {
     console.error("Local .env reading process skipped:", err.message);
 }
 
-// 2. Map Render's native environment variables as the primary layer, falling back to disk if needed
 const TELEGRAM_BOT_TOKEN = (process.env.TELEGRAM_BOT_TOKEN || config.TELEGRAM_BOT_TOKEN || '').replace(/[{}]/g, '').trim();
 const TELEGRAM_CHAT_ID = (process.env.TELEGRAM_CHAT_ID || config.TELEGRAM_CHAT_ID || '').replace(/[{}]/g, '').trim();
 const RAW_TOKENS = process.env.DISCORD_TOKEN || config.DISCORD_TOKEN || '';
@@ -42,19 +40,15 @@ if (DISCORD_TOKENS.length === 0 || !TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
 }
 // ========================================================
 
-// Track active accounts and total successful logins for the monitoring report
 const activeAccounts = [];
 
-// Helper function to insert a brief pause between logins to maintain perfect line order
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-// 2. Wrapped Function returning a Promise to enforce strictly ordered sequential execution
 function createSelfbotInstance(token, index) {
     return new Promise((resolve) => {
         const accountNumber = index + 1;
         const cleanToken = token ? token.trim() : '';
 
-        // Safety check for empty entries caused by accidental double commas or spaces in .env
         if (!cleanToken) {
             console.error(`❌ [Account #${accountNumber}] Skipped: Empty space or trailing comma on this position.`);
             resolve();
@@ -67,25 +61,40 @@ function createSelfbotInstance(token, index) {
         client.on('ready', async () => {
             console.log(`[Account #${accountNumber}] Logged in as ${client.user.tag}`);
             
-            // Add this account's details to our tracking list
             activeAccounts.push(`• Account #${accountNumber}: ${client.user.tag} (ID: ${client.user.id})`);
 
-            // Pre-populate existing friends on login so old friends don't trigger updates
             client.relationships.friendCache.forEach((user, id) => {
                 knownFriends.add(id);
             });
 
-            resolve(); // Advance execution order to the next token on the line
+            resolve(); 
         });
 
-        // --- userUpdate listener tracks friend list changes instead of relationshipUpdate ---
+        // SPEED OPTIMIZATION: Instant listener catches friend status changes in real-time
+        client.on('relationshipAdd', async (relationship) => {
+            try {
+                if (relationship.type === 'friend' && !knownFriends.has(relationship.id)) {
+                    knownFriends.add(relationship.id);
+                    const friendUser = relationship.user;
+                    console.log(`[${client.user.username}] Friend acceptance verified instantly: ${friendUser.tag}`);
+
+                    const alertText = `🎉 Friend Request Accepted!\n\n` +
+                                      `Account: ${client.user.tag}\n` +
+                                      `New Friend: ${friendUser.tag} (${friendUser.id})`;
+                    
+                    await sendToTelegram(alertText);
+                }
+            } catch (error) {
+                console.error(`[${client.user.username || 'Unknown'}] Error in relationshipAdd tracking:`, error);
+            }
+        });
+
+        // Backup listener catches any delayed cache synchronization checkpoints safely
         client.on('userUpdate', async () => {
             try {
                 client.relationships.friendCache.forEach(async (friendUser, friendId) => {
                     if (!knownFriends.has(friendId)) {
-                        // Cache the new entry immediately so it doesn't alert multiple times
                         knownFriends.add(friendId);
-                        
                         console.log(`[${client.user.username}] New friend accepted: ${friendUser.tag}`);
 
                         const alertText = `🎉 Friend Request Accepted!\n\n` +
@@ -102,26 +111,21 @@ function createSelfbotInstance(token, index) {
 
         client.on('messageCreate', async (message) => {
             try {
-                // --- FIXED ONLY: Instantly drops server text channels to kill the loops entirely ---
                 if (message.channel.type !== 'DM' && message.channel.type !== 1) {
                     return;
                 }
 
-                // Debug logging specific to which account caught it (only fires for DMs now)
                 console.log(`[${client.user.username}] Message received: Channel type: ${message.channel.type}, Author: ${message.author.tag}`);
                 
-                // Check for DMs - ignore bot authors and ignore message if the author is this specific client instance
                 if (!message.author.bot && message.author.id !== client.user.id) {
                     console.log(`[${client.user.username}] DM detected! Forwarding to Telegram...`);
                     
-                    // Handle text content
                     let text = `🎉 New Message Alert
                     DM to ${client.user.tag} \nfrom ${message.author.tag} \n(${message.author.id}):`;
                     if (message.content) {
                         text += `\n${message.content}`;
                     }
                     
-                    // Handle attachments
                     if (message.attachments.size > 0) {
                         for (const attachment of message.attachments.values()) {
                             if (attachment.contentType && attachment.contentType.startsWith('image/')) {
@@ -145,18 +149,17 @@ function createSelfbotInstance(token, index) {
 
         client.login(cleanToken).catch(err => {
             console.error(`❌ [Account #${accountNumber}] Failed to log in: ${err.message}`);
-            resolve(); // Advance execution order even on errors so the code boot sequence stays active
+            resolve(); 
         });
     });
 }
 
-// --- Synchronous boot sequence forces perfect chronological matching ---
 async function bootSequence() {
     console.log(`🔄 Processing sequential login checks for ${DISCORD_TOKENS.length} tokens...`);
     
     for (let i = 0; i < DISCORD_TOKENS.length; i++) {
         await createSelfbotInstance(DISCORD_TOKENS[i], i);
-        await sleep(1200); // 1.2-second safety delay protects your accounts from IP rate-limit grouping flags
+        await sleep(1200); 
     }
     
     console.log(`\n🏁 Verification completed. Pushing active dashboard list to Telegram...`);
@@ -167,7 +170,6 @@ async function bootSequence() {
     await sendToTelegram(startupMessage);
 }
 
-// Fire the sequential engine
 bootSequence();
 
 // --- Telegram helper functions ---
@@ -178,7 +180,7 @@ async function sendImageToTelegram(imageUrl, caption) {
         return;
     }
     try {
-        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`;
+        const url = 'https://telegram.org' + TELEGRAM_BOT_TOKEN + '/sendPhoto';
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -205,7 +207,7 @@ async function sendToTelegram(text) {
         return;
     }
     try {
-        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+        const url = 'https://telegram.org' + TELEGRAM_BOT_TOKEN + '/sendMessage';
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
