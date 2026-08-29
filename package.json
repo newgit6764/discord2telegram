@@ -1,0 +1,12 @@
+{
+    "name": "discord-to-telegram",
+    "version": "1.0.0",
+    "description": "Multi-account Discord selfbot forwarder to Telegram",
+    "main": "index.js",
+    "dependencies": {
+        "axios": "^1.20.0",
+        "discord.js-selfbot-v13": "3.7.1",
+        "dotenv": "^16.4.5",
+        "node-fetch": "^2.7.0"
+    }
+}
