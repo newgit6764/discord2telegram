@@ -4,9 +4,11 @@ const fs = require('fs');
 const path = require('path');
 
 // ========================================================
-// SAFE ENVIRONMENT FILE PARSER (BYPASSES DOTENV CACHE BUGS)
+// HYBRID ENVIRONMENT VARIABLES ENGINE (LOCAL & CLOUD SAFE)
 // ========================================================
 const config = {};
+
+// 1. Check if a local physical .env file exists on the hard disk (Local Mac fallback)
 try {
     const envPath = path.join(__dirname, '.env');
     if (fs.existsSync(envPath)) {
@@ -19,24 +21,23 @@ try {
             if (firstEquals === -1) return;
             
             const key = trimmedLine.substring(0, firstEquals).trim();
-            // Completely strips accidental brackets, braces, and quotes from values
-            const value = trimmedLine.substring(firstEquals + 1)
-                .replace(/[{}"']/g, '')
-                .trim();
-                
+            const value = trimmedLine.substring(firstEquals + 1).replace(/[{}"']/g, '').trim();
             config[key] = value;
         });
     }
 } catch (err) {
-    console.error("Manual .env reading error:", err.message);
+    console.error("Local .env reading process skipped:", err.message);
 }
 
-const TELEGRAM_BOT_TOKEN = config.TELEGRAM_BOT_TOKEN || '';
-const TELEGRAM_CHAT_ID = config.TELEGRAM_CHAT_ID || '';
-const DISCORD_TOKENS = config.DISCORD_TOKEN ? config.DISCORD_TOKEN.split(',') : [];
+// 2. Map Render's native environment variables as the primary layer, falling back to disk if needed
+const TELEGRAM_BOT_TOKEN = (process.env.TELEGRAM_BOT_TOKEN || config.TELEGRAM_BOT_TOKEN || '').replace(/[{}]/g, '').trim();
+const TELEGRAM_CHAT_ID = (process.env.TELEGRAM_CHAT_ID || config.TELEGRAM_CHAT_ID || '').replace(/[{}]/g, '').trim();
+const RAW_TOKENS = process.env.DISCORD_TOKEN || config.DISCORD_TOKEN || '';
+
+const DISCORD_TOKENS = RAW_TOKENS ? RAW_TOKENS.split(',').map(token => token.replace(/[{}]/g, '').trim()) : [];
 
 if (DISCORD_TOKENS.length === 0 || !TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
-    console.error("Critical Verification Error: Missing clean variables in your .env file!");
+    console.error("Critical Verification Error: Missing clean variables in your .env file or Render Environment tab!");
     process.exit(1);
 }
 // ========================================================
@@ -149,7 +150,7 @@ function createSelfbotInstance(token, index) {
     });
 }
 
-// --- ONLY EDITED ORDER: Synchronous boot sequence forces perfect chronological matching ---
+// --- Synchronous boot sequence forces perfect chronological matching ---
 async function bootSequence() {
     console.log(`🔄 Processing sequential login checks for ${DISCORD_TOKENS.length} tokens...`);
     
@@ -177,7 +178,7 @@ async function sendImageToTelegram(imageUrl, caption) {
         return;
     }
     try {
-        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`;
+        const url = `https://telegram.org{TELEGRAM_BOT_TOKEN}/sendPhoto`;
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -204,7 +205,7 @@ async function sendToTelegram(text) {
         return;
     }
     try {
-        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+        const url = `https://telegram.org{TELEGRAM_BOT_TOKEN}/sendMessage`;
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
