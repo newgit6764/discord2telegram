@@ -215,7 +215,7 @@ async function bootSequence() {
         
         for (let i = 0; i < tokens.length; i++) {
             await createSelfbotInstance(tokens[i], i, tokens.length);
-            await sleep(3500); 
+            await sleep(15000); 
         }
         console.log("Verification completed.");
     } catch (err) {
