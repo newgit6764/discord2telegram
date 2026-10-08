@@ -239,7 +239,7 @@ bootSequence();
 async function sendImageToTelegram(imageUrl, caption) {
     if (!TELEGRAM_CHAT_ID) return;
     try {
-        const url = `https://telegram.org{TELEGRAM_BOT_TOKEN}/sendPhoto`;
+        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`;
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -263,7 +263,7 @@ async function sendImageToTelegram(imageUrl, caption) {
 async function sendToTelegram(text) {
     if (!TELEGRAM_CHAT_ID) return;
     try {
-        const url = `https://telegram.org{TELEGRAM_BOT_TOKEN}/sendMessage`;
+        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
