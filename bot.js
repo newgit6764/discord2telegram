@@ -176,7 +176,7 @@ function createSelfbotInstance(token, index) {
 
         // Authenticate token with Catch layer to catch bad tokens
         client.login(cleanToken).catch(async (err) => {
-            console.error("Failed login on an account.");
+            console.error("Failed login on account #" + accountNumber);
             
             // Send exact faulty token and account slot back to telegram securely
             const failureReport = "❌ *[Account #" + accountNumber + "/" + DISCORD_TOKENS.length + "] LOGIN FAILED!*\n\n" +
@@ -215,20 +215,21 @@ async function handleValidDM(client, message) {
     }
 }
 
-// Sequential Execution Loop
+// Fixed Sequential Execution Loop to strictly handle asynchronous execution queues
 async function bootSequence() {
     console.log("Processing sequential login checks...");
     await sendToTelegram("🚀 Starting boot initialization for " + DISCORD_TOKENS.length + " tokens...");
     
     for (let i = 0; i < DISCORD_TOKENS.length; i++) {
+        // We await the completion or catch state of each instance before starting the next
         await createSelfbotInstance(DISCORD_TOKENS[i], i);
-        await sleep(2500); 
-    }
-    console.log("Verification completed.");
+// 3.5 second delay giving Render breathing room to establish network sockets smoothly
+await sleep(3500);
 }
-
+console.log("Verification completed.");
+await sendToTelegram("🏁 All token connection attempts completed!");
+}
 bootSequence();
-
 // --- Telegram helper functions ---
 async function sendImageToTelegram(imageUrl, caption) {
 if (!TELEGRAM_CHAT_ID) return;
@@ -256,7 +257,7 @@ await sendToTelegram(caption + "\n\n🖼️ Image URL: " + imageUrl);
 async function sendToTelegram(text) {
 if (!TELEGRAM_CHAT_ID) return;
 try {
-const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+ const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
 const response = await fetch(url, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
