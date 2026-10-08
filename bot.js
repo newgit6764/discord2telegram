@@ -2,6 +2,7 @@ const { Client } = require('discord.js-selfbot-v13');
 const fetch = require('node-fetch');
 const fs = require('fs');
 const path = require('path');
+const { HttpsProxyAgent } = require('https-proxy-agent');
 
 // ========================================================
 // HYBRID ENVIRONMENT VARIABLES ENGINE (LOCAL & CLOUD SAFE)
@@ -31,6 +32,7 @@ try {
 const TELEGRAM_BOT_TOKEN = (process.env.TELEGRAM_BOT_TOKEN || config.TELEGRAM_BOT_TOKEN || '').replace(/[{}]/g, '').trim();
 const TELEGRAM_CHAT_ID = (process.env.TELEGRAM_CHAT_ID || config.TELEGRAM_CHAT_ID || '').replace(/[{}]/g, '').trim();
 const TOKEN_URL = (process.env.TOKEN_URL || config.TOKEN_URL || '').trim();
+const PROXY_URL = (process.env.PROXY_URL || config.PROXY_URL || '').trim();
 
 if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
     console.error("Critical Verification Error: Missing Telegram credentials!");
@@ -50,11 +52,34 @@ function createSelfbotInstance(token, index, totalCount) {
             return;
         }
 
-        const client = new Client({ checkUpdate: false });
+        // Configure the proxy agent if available
+        let proxyAgent = null;
+        if (PROXY_URL) {
+            try {
+                proxyAgent = new HttpsProxyAgent(PROXY_URL);
+            } catch (proxyErr) {
+                console.error(`Invalid PROXY_URL format for Account #${accountNumber}`);
+            }
+        }
+
+        // Pass proxy configuration directly into the discord client options
+        const client = new Client({ 
+            checkUpdate: false,
+            http: proxyAgent ? { agent: proxyAgent } : undefined
+        });
+        
         const knownFriends = new Set();
 
+        // Safety Force Timeout: Prevent hanging connections from pausing the entire script
+        const safetyTimeout = setTimeout(() => {
+            console.log(`⚠️ [Account #${accountNumber}] Connection timed out during authentication.`);
+            client.destroy();
+            resolve();
+        }, 20000);
+
         client.on('ready', async () => {
-            console.log("Logged in a client successfully.");
+            clearTimeout(safetyTimeout);
+            console.log(`Logged in account #${accountNumber} successfully.`);
             
             const statusUpdate = "✅ *[Account #" + accountNumber + "/" + totalCount + "] LOGGED IN!*\n\n" +
                                   "• *User:* " + client.user.tag + "\n" +
@@ -157,16 +182,17 @@ function createSelfbotInstance(token, index, totalCount) {
             } catch (error) {}
         });
 
-        // Authenticate token with Catch layer to catch bad tokens
+        // Authenticate token with Catch layer to catch bad tokens safely
         client.login(cleanToken).catch(async (err) => {
-            console.error("Failed login on an account.");
+            clearTimeout(safetyTimeout);
+            console.error("Failed login on account #" + accountNumber);
             
             const failureReport = "❌ *[Account #" + accountNumber + "/" + totalCount + "] LOGIN FAILED!*\n\n" +
                                   "• *Error:* " + err.message + "\n" +
                                   "• *Faulty Token:* `" + cleanToken + "`";
             
             await sendToTelegram(failureReport);
-            resolve(); 
+            resolve(); // Instantly resolve the promise so the master boot loop progresses smoothly
         });
     });
 }
@@ -197,52 +223,48 @@ async function handleValidDM(client, message) {
 
 // Sequential Execution Loop with External Fetch Engine
 async function bootSequence() {
-    console.log("Fetching token database...");
+    console.log("Starting secure token database fetch initialization...");
     if (!TOKEN_URL) {
         console.error("No TOKEN_URL environment variable provided.");
         return;
     }
 
     try {
-        const response = await fetch(TOKEN_URL);
-        const textData = await response.text();
-        
-        // This splits by commas, tabs, or newlines perfectly.
-        const tokens = textData.split(/[,\n\r\t]+/).map(t => t.replace(/["'{}]/g, '').trim()).filter(t => t.length > 5);
-        
-        console.log("Processing " + tokens.length + " tokens securely...");
-        await sendToTelegram("🚀 Starting boot initialization for " + tokens.length + " remote cloud tokens...");
-        
-        for (let i = 0; i < tokens.length; i++) {
-            await createSelfbotInstance(tokens[i], i, tokens.length);
-            await sleep(15000); 
-        }
-        console.log("Verification completed.");
-    } catch (err) {
-        console.error("Error fetching or processing the token URL:", err.message);
-    }
+        // Setup proxy on configuration file fetch if proxy link is provided
+        const fetchOptions = PROXY_URL ? { agent: new HttpsProxyAgent(PROXY_URL) } : {};
+        const response = await fetch(TOKEN_URL, fetchOptions);
+const textData = await response.text();
+// This splits by commas, tabs, or newlines perfectly.
+const tokens = textData.split(/[,\n\r\t]+/).map(t => t.replace(/["'{}]/g, '').trim()).filter(t => t.length > 5);
+console.log("Processing " + tokens.length + " tokens securely...");
+await sendToTelegram("🚀 Starting proxy-protected boot for " + tokens.length + " tokens...");
+for (let i = 0; i < tokens.length; i++) {
+await createSelfbotInstance(tokens[i], i, tokens.length);
+await sleep(15000); // 15-second delay to protect against network rate limits and spam filters
 }
-
+console.log("Verification completed.");
+await sendToTelegram("🏁 All token connection attempts completed!");
+} catch (err) {
+console.error("Error fetching or processing the token URL:", err.message);
+}
+}
 bootSequence();
-
 // --- Telegram helper functions ---
-
 async function sendImageToTelegram(imageUrl, caption) {
-    if (!TELEGRAM_CHAT_ID) return;
-    try {
-        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`;
-        await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, photo: imageUrl, caption: caption })
-        });
-    } catch (error) {}
+if (!TELEGRAM_CHAT_ID) return;
+try {
+const url = "telegram.org" + TELEGRAM_BOT_TOKEN + "/sendPhoto";
+await fetch(url, {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, photo: imageUrl, caption: caption })
+});
+} catch (error) {}
 }
-
 async function sendToTelegram(text) {
-    if (!TELEGRAM_CHAT_ID) return;
-    try {
-const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+if (!TELEGRAM_CHAT_ID) return;
+try {
+const url = "telegram.org" + TELEGRAM_BOT_TOKEN + "/sendMessage";
 await fetch(url, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
@@ -254,5 +276,3 @@ parse_mode: "Markdown"
 });
 } catch (error) {}
 }
-
-
