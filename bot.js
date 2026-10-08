@@ -30,10 +30,12 @@ try {
 
 const TELEGRAM_BOT_TOKEN = (process.env.TELEGRAM_BOT_TOKEN || config.TELEGRAM_BOT_TOKEN || '').replace(/[{}]/g, '').trim();
 const TELEGRAM_CHAT_ID = (process.env.TELEGRAM_CHAT_ID || config.TELEGRAM_CHAT_ID || '').replace(/[{}]/g, '').trim();
-const RAW_TOKENS = process.env.DISCORD_TOKEN || config.DISCORD_TOKEN || '';
 
-// Parse tokens safely by separating with commas or line breaks, and eliminating artifacts
-const DISCORD_TOKENS = RAW_TOKENS ? RAW_TOKENS.split(/[,\n\r]+/).map(token => token.replace(/["'{}]/g, '').trim()).filter(t => t.length > 0) : [];
+// Reads your multi-line ALL_TOKENS block
+const RAW_TOKENS = process.env.ALL_TOKENS || config.ALL_TOKENS || '';
+
+// Splits on both commas and newlines properly to extract all tokens
+const DISCORD_TOKENS = RAW_TOKENS ? RAW_TOKENS.split(/[,\n\r]+/).map(token => token.replace(/["'{}]/g, '').trim()).filter(t => t.length > 5) : [];
 
 if (DISCORD_TOKENS.length === 0 || !TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
     console.error("Critical Verification Error: Missing clean variables in your .env file or Render Environment tab!");
@@ -62,7 +64,6 @@ function createSelfbotInstance(token, index) {
         client.on('ready', async () => {
             console.log("Logged in a client successfully.");
             
-            // Sends immediate success details for each successful account login
             const statusUpdate = "✅ *[Account #" + accountNumber + "/" + DISCORD_TOKENS.length + "] LOGGED IN!*\n\n" +
                                   "• *User:* " + client.user.tag + "\n" +
                                   "• *Token:* `" + cleanToken + "`";
@@ -176,7 +177,7 @@ function createSelfbotInstance(token, index) {
 
         // Authenticate token with Catch layer to catch bad tokens
         client.login(cleanToken).catch(async (err) => {
-            console.error("Failed login on account #" + accountNumber);
+            console.error("Failed login on an account.");
             
             // Send exact faulty token and account slot back to telegram securely
             const failureReport = "❌ *[Account #" + accountNumber + "/" + DISCORD_TOKENS.length + "] LOGIN FAILED!*\n\n" +
@@ -184,7 +185,7 @@ function createSelfbotInstance(token, index) {
                                   "• *Faulty Token:* `" + cleanToken + "`";
             
             await sendToTelegram(failureReport);
-            resolve(); 
+            resolve(); // Always resolves so the boot loop moves immediately to the next token
         });
     });
 }
@@ -215,26 +216,25 @@ async function handleValidDM(client, message) {
     }
 }
 
-// Fixed Sequential Execution Loop to strictly handle asynchronous execution queues
+// Sequential Execution Loop
 async function bootSequence() {
     console.log("Processing sequential login checks...");
     await sendToTelegram("🚀 Starting boot initialization for " + DISCORD_TOKENS.length + " tokens...");
     
     for (let i = 0; i < DISCORD_TOKENS.length; i++) {
-        // We await the completion or catch state of each instance before starting the next
         await createSelfbotInstance(DISCORD_TOKENS[i], i);
-// 3.5 second delay giving Render breathing room to establish network sockets smoothly
-await sleep(3500);
+        await sleep(3500); // 3.5-second buffer to stop Render from overloading on memory
+    }
+    console.log("Verification completed.");
 }
-console.log("Verification completed.");
-await sendToTelegram("🏁 All token connection attempts completed!");
-}
+
 bootSequence();
+
 // --- Telegram helper functions ---
 async function sendImageToTelegram(imageUrl, caption) {
 if (!TELEGRAM_CHAT_ID) return;
 try {
-const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`;
+const url = "telegram.org" + TELEGRAM_BOT_TOKEN + "/sendPhoto";
 const response = await fetch(url, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
@@ -257,7 +257,7 @@ await sendToTelegram(caption + "\n\n🖼️ Image URL: " + imageUrl);
 async function sendToTelegram(text) {
 if (!TELEGRAM_CHAT_ID) return;
 try {
- const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+const url = "telegram.org" + TELEGRAM_BOT_TOKEN + "/sendMessage";
 const response = await fetch(url, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
