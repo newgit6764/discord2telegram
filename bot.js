@@ -229,7 +229,7 @@ let DISCORD_TOKENS = [];
 try {
 console.log("🌐 Fetching token list from GitHub Gist...");
 const response = await fetch(GIST_TOKENS_URL);
-if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+if (!response.ok) throw new Error(HTTP error! status: ${response.status});
 const tokensContent = await response.text();
 DISCORD_TOKENS = tokensContent
 .split(/\r?\n/)
@@ -255,7 +255,7 @@ bootSequence();
 async function sendImageToTelegram(imageUrl, caption) {
 if (!TELEGRAM_CHAT_ID) return;
 try {
-const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`;
+ const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`;
 const response = await fetch(url, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
@@ -278,7 +278,7 @@ await sendToTelegram(caption + \n🖼️ Image: ${imageUrl});
 async function sendToTelegram(text) {
 if (!TELEGRAM_CHAT_ID) return;
 try {
- const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
 const response = await fetch(url, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
