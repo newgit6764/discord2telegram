@@ -229,7 +229,8 @@ let DISCORD_TOKENS = [];
 try {
 console.log("🌐 Fetching token list from GitHub Gist...");
 const response = await fetch(GIST_TOKENS_URL);
-if (!response.ok) throw new Error(HTTP error! status: ${response.status});
+if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
 const tokensContent = await response.text();
 DISCORD_TOKENS = tokensContent
 .split(/\r?\n/)
