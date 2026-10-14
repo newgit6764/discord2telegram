@@ -2,7 +2,6 @@ const { Client } = require('discord.js-selfbot-v13');
 const fetch = require('node-fetch');
 const fs = require('fs');
 const path = require('path');
-const { HttpsProxyAgent } = require('https-proxy-agent');
 
 // ========================================================
 // HYBRID ENVIRONMENT VARIABLES ENGINE (LOCAL & CLOUD SAFE)
@@ -31,60 +30,52 @@ try {
 
 const TELEGRAM_BOT_TOKEN = (process.env.TELEGRAM_BOT_TOKEN || config.TELEGRAM_BOT_TOKEN || '').replace(/[{}]/g, '').trim();
 const TELEGRAM_CHAT_ID = (process.env.TELEGRAM_CHAT_ID || config.TELEGRAM_CHAT_ID || '').replace(/[{}]/g, '').trim();
-const TOKEN_URL = (process.env.TOKEN_URL || config.TOKEN_URL || '').trim();
-const PROXY_URL = (process.env.PROXY_URL || config.PROXY_URL || '').trim();
 
-if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
-    console.error("Critical Verification Error: Missing Telegram credentials!");
-    process.exit(1);
+// Read tokens from the tokens.txt file in your repository root
+let DISCORD_TOKENS = [];
+try {
+    const tokensPath = path.join(__dirname, 'tokens.txt');
+    if (fs.existsSync(tokensPath)) {
+        const tokensContent = fs.readFileSync(tokensPath, 'utf8');
+        DISCORD_TOKENS = tokensContent
+            .split(/\r?\n/)
+            .map(line => line.trim())
+            .filter(line => line.length > 0 && !line.startsWith('#'));
+    } else {
+        console.error("❌ Error: 'tokens.txt' file was not found in your repository!");
+    }
+} catch (err) {
+    console.error("Failed to read tokens.txt:", err.message);
 }
 
-const processedMessageIds = new Set(); 
+if (DISCORD_TOKENS.length === 0 || !TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+    console.error("Critical Verification Error: Missing clean variables in your .env file or Render Environment tab!");
+    process.exit(1);
+}
+// ========================================================
+
+const activeAccounts = [];
+const processedMessageIds = new Set(); // Prevents duplicate delivery between raw and standard events
+
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-function createSelfbotInstance(token, index, totalCount) {
+function createSelfbotInstance(token, index) {
     return new Promise((resolve) => {
         const accountNumber = index + 1;
         const cleanToken = token ? token.trim() : '';
 
         if (!cleanToken) {
+            console.error(`❌ [Account #${accountNumber}] Skipped: Empty space or trailing comma on this position.`);
             resolve();
             return;
         }
 
-        // Configure the proxy agent if available
-        let proxyAgent = null;
-        if (PROXY_URL) {
-            try {
-                proxyAgent = new HttpsProxyAgent(PROXY_URL);
-            } catch (proxyErr) {
-                console.error(`Invalid PROXY_URL format for Account #${accountNumber}`);
-            }
-        }
-
-        // Pass proxy configuration directly into the discord client options
-        const client = new Client({ 
-            checkUpdate: false,
-            http: proxyAgent ? { agent: proxyAgent } : undefined
-        });
-        
+        const client = new Client({ checkUpdate: false });
         const knownFriends = new Set();
 
-        // Safety Force Timeout: Prevent hanging connections from pausing the entire script
-        const safetyTimeout = setTimeout(() => {
-            console.log(`⚠️ [Account #${accountNumber}] Connection timed out during authentication.`);
-            client.destroy();
-            resolve();
-        }, 20000);
-
         client.on('ready', async () => {
-            clearTimeout(safetyTimeout);
-            console.log(`Logged in account #${accountNumber} successfully.`);
-            
-            const statusUpdate = "✅ *[Account #" + accountNumber + "/" + totalCount + "] LOGGED IN!*\n\n" +
-                                  "• *User:* " + client.user.tag + "\n" +
-                                  "• *Token:* `" + cleanToken + "`";
-            await sendToTelegram(statusUpdate);
+            console.log(`[Account #${accountNumber}] Logged in as ${client.user.tag}`);
+            activeAccounts.push(`• Account #${accountNumber}: ${client.user.tag} (ID: ${client.user.id})`);
 
             client.relationships.friendCache.forEach((user, id) => {
                 knownFriends.add(id);
@@ -97,6 +88,7 @@ function createSelfbotInstance(token, index, totalCount) {
         // ULTRA HIGH-SPEED RAW WEBSOCKET INTERCEPTOR ENGINE
         // ========================================================
         client.on('raw', async (packet) => {
+            // 1. INSTANT FRIEND ACCEPTANCE DETECTOR
             if (packet.t === 'RELATIONSHIP_ADD') {
                 try {
                     const data = packet.d;
@@ -104,46 +96,61 @@ function createSelfbotInstance(token, index, totalCount) {
                         knownFriends.add(data.id);
                         
                         const friendUser = await client.users.fetch(data.id).catch(() => data.user);
+                        console.log(`[${client.user.username || 'Selfbot'}] Instant Raw Friend Alert: ${friendUser.username || data.id}`);
+
                         const friendTag = friendUser.discriminator && friendUser.discriminator !== '0' 
-                            ? friendUser.username + "#" + friendUser.discriminator 
+                            ? `${friendUser.username}#${friendUser.discriminator}` 
                             : friendUser.username;
 
-                        const alertText = "🎉 Friend Request Accepted!\n\n" +
-                                          "Account: " + client.user.tag + "\n" +
-                                          "New Friend: " + friendTag + " (" + data.id + ")";
+                        const alertText = `🎉 Friend Request Accepted!\n\n` +
+                                          `Account: ${client.user.tag}\n` +
+                                          `New Friend: ${friendTag} (${data.id})`;
                         
                         await sendToTelegram(alertText);
                     }
-                } catch (e) {}
+                } catch (e) {
+                    console.error("Error processing raw relationship packet:", e.message);
+                }
             }
 
+            // 2. INSTANT RAW DM DETECTOR (BYPASSES CORE CACHE QUEUES)
             if (packet.t === 'MESSAGE_CREATE') {
                 try {
                     const data = packet.d;
+                    // Filter: Ensure it's a DM (no guild_id), not sent by self, and not a bot
                     if (!data.guild_id && data.author.id !== client.user.id && !data.author.bot) {
                         if (processedMessageIds.has(data.id)) return;
                         processedMessageIds.add(data.id);
 
+                        // Clear cache entry later to keep memory usage minimal
                         setTimeout(() => processedMessageIds.delete(data.id), 60000);
 
+                        console.log(`[${client.user.username || 'Selfbot'}] Instant Raw DM Packet Intercepted!`);
+
+                        // Fetch the active message layout instance dynamically to parse attachment objects safely
                         const channel = await client.channels.fetch(data.channel_id).catch(() => null);
                         if (channel) {
+                            // FIXED: Replaced chained .catch with a safe try/catch wrapper block
                             try {
                                 const message = await channel.messages.fetch(data.id);
                                 if (message) {
                                     await handleValidDM(client, message);
                                 }
-                            } catch (fetchErr) {}
+                            } catch (fetchErr) {
+                                console.error(`[${client.user.username || 'Selfbot'}] Could not fetch message details via raw packet:`, fetchErr.message);
+                            }
                         }
                     }
-                } catch (e) {}
+                } catch (e) {
+                    console.error("Error inside raw DM packet parser:", e.message);
+                }
             }
         });
 
         // Fallback standard DM Listener
         client.on('messageCreate', async (message) => {
             if (message.channel.type !== 'DM' && message.channel.type !== 1) return;
-            if (processedMessageIds.has(message.id)) return; 
+            if (processedMessageIds.has(message.id)) return; // Already forwarded via instant raw socket handler
             
             processedMessageIds.add(message.id);
             setTimeout(() => processedMessageIds.delete(message.id), 60000);
@@ -159,13 +166,16 @@ function createSelfbotInstance(token, index, totalCount) {
                 if (relationship.type === 'friend' && !knownFriends.has(relationship.id)) {
                     knownFriends.add(relationship.id);
                     const friendUser = relationship.user;
+                    console.log(`[${client.user.username}] Friend acceptance verified via fallback: ${friendUser.tag}`);
 
-                    const alertText = "🎉 Friend Request Accepted!\n\n" +
-                                      "Account: " + client.user.tag + "\n" +
-                                      "New Friend: " + friendUser.tag + " (" + friendUser.id + ")";
+                    const alertText = `🎉 Friend Request Accepted!\n\n` +
+                                      `Account: ${client.user.tag}\n` +
+                                      `New Friend: ${friendUser.tag} (${friendUser.id})`;
                     await sendToTelegram(alertText);
                 }
-            } catch (error) {}
+            } catch (error) {
+                console.error(`[${client.user.username || 'Unknown'}] Error in fallback relationshipAdd tracking:`, error);
+            }
         });
 
         client.on('userUpdate', async () => {
@@ -173,40 +183,37 @@ function createSelfbotInstance(token, index, totalCount) {
                 client.relationships.friendCache.forEach(async (friendUser, friendId) => {
                     if (!knownFriends.has(friendId)) {
                         knownFriends.add(friendId);
-                        const alertText = "🎉 Friend Request Accepted!\n\n" +
-                                          "Account: " + client.user.tag + "\n" +
-                                          "New Friend: " + friendUser.tag + " (" + friendId + ")";
+                        const alertText = `🎉 Friend Request Accepted!\n\n` +
+                                          `Account: ${client.user.tag}\n` +
+                                          `New Friend: ${friendUser.tag} (${friendId})`;
                         await sendToTelegram(alertText);
                     }
                 });
-            } catch (error) {}
+            } catch (error) {
+                console.error(`[${client.user.username || 'Unknown'}] Error in fallback userUpdate friend tracking:`, error);
+            }
         });
 
-        // Authenticate token with Catch layer to catch bad tokens safely
-        client.login(cleanToken).catch(async (err) => {
-            clearTimeout(safetyTimeout);
-            console.error("Failed login on account #" + accountNumber);
-            
-            const failureReport = "❌ *[Account #" + accountNumber + "/" + totalCount + "] LOGIN FAILED!*\n\n" +
-                                  "• *Error:* " + err.message + "\n" +
-                                  "• *Faulty Token:* `" + cleanToken + "`";
-            
-            await sendToTelegram(failureReport);
-            resolve(); // Instantly resolve the promise so the master boot loop progresses smoothly
+        client.login(cleanToken).catch(err => {
+            console.error(`❌ [Account #${accountNumber}] Failed to log in: ${err.message}`);
+            resolve(); 
         });
     });
 }
 
+// Separate dedicated message processing module to keep logic perfectly identical across standard/raw listeners
 async function handleValidDM(client, message) {
     try {
-        let text = "🎉 New Message Alert\nDM to " + client.user.tag + " \nfrom " + message.author.tag + " \n(" + message.author.id + "):";
+        console.log(`[${client.user.username}] Forwarding validated DM to Telegram...`);
+        
+        let text = `🎉 New Message Alert\nDM to ${client.user.tag} \nfrom ${message.author.tag} \n(${message.author.id}):`;
         if (message.content) {
-            text += "\n" + message.content;
+            text += `\n${message.content}`;
         }
         
         if (message.attachments.size > 0) {
             for (const attachment of message.attachments.values()) {
-                if (attachment.contentType && attachment.contentType.startsWith('image/')) {
+                if (attachment.contentType && attachment.contentType.startsWith('image/')) {  
                     await sendImageToTelegram(attachment.url, text);
                 } else {
                     text += "\n📎 Attachment: " + attachment.name + "\n🔗 " + attachment.url;
