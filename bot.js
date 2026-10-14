@@ -2,6 +2,7 @@ const { Client } = require('discord.js-selfbot-v13');
 const fetch = require('node-fetch');
 const fs = require('fs');
 const path = require('path');
+const { HttpsProxyAgent } = require('https-proxy-agent');
 
 // ========================================================
 // HYBRID ENVIRONMENT VARIABLES ENGINE (LOCAL & CLOUD SAFE)
@@ -31,6 +32,7 @@ try {
 const TELEGRAM_BOT_TOKEN = (process.env.TELEGRAM_BOT_TOKEN || config.TELEGRAM_BOT_TOKEN || '').replace(/[{}]/g, '').trim();
 const TELEGRAM_CHAT_ID = (process.env.TELEGRAM_CHAT_ID || config.TELEGRAM_CHAT_ID || '').replace(/[{}]/g, '').trim();
 const GIST_TOKENS_URL = (process.env.GIST_TOKENS_URL || config.GIST_TOKENS_URL || '').trim();
+const PROXY_URL = (process.env.PROXY_URL || config.PROXY_URL || '').trim();
 
 // EXACT ERROR IDENTIFIER SYSTEM
 if (!TELEGRAM_BOT_TOKEN) {
@@ -65,7 +67,21 @@ function createSelfbotInstance(token, index) {
             return;
         }
 
-        const client = new Client({ checkUpdate: false });
+        // Configure the proxy agent if available to mask Render's datacenter IP
+        let proxyAgent = null;
+        if (PROXY_URL) {
+            try {
+                proxyAgent = new HttpsProxyAgent(PROXY_URL);
+            } catch (proxyErr) {
+                console.error('Invalid PROXY_URL format for Account #' + accountNumber);
+            }
+        }
+
+        const client = new Client({ 
+            checkUpdate: false,
+            http: proxyAgent ? { agent: proxyAgent } : undefined
+        });
+        
         const knownFriends = new Set();
 
         client.on('ready', async () => {
@@ -112,17 +128,14 @@ function createSelfbotInstance(token, index) {
             if (packet.t === 'MESSAGE_CREATE') {
                 try {
                     const data = packet.d;
-                    // Filter: Ensure it's a DM (no guild_id), not sent by self, and not a bot
                     if (!data.guild_id && data.author.id !== client.user.id && !data.author.bot) {
                         if (processedMessageIds.has(data.id)) return;
                         processedMessageIds.add(data.id);
 
-                        // Clear cache entry later to keep memory usage minimal
                         setTimeout(() => processedMessageIds.delete(data.id), 60000);
 
                         console.log('[' + (client.user.username || 'Selfbot') + '] Instant Raw DM Packet Intercepted!');
 
-                        // Fetch the active message layout instance dynamically to parse attachment objects safely
                         const channel = await client.channels.fetch(data.channel_id).catch(() => null);
                         if (channel) {
                             try {
@@ -144,7 +157,7 @@ function createSelfbotInstance(token, index) {
         // Fallback standard DM Listener
         client.on('messageCreate', async (message) => {
             if (message.channel.type !== 'DM' && message.channel.type !== 1) return;
-            if (processedMessageIds.has(message.id)) return; // Already forwarded via instant raw socket handler
+            if (processedMessageIds.has(message.id)) return;
             
             processedMessageIds.add(message.id);
             setTimeout(() => processedMessageIds.delete(message.id), 60000);
@@ -195,7 +208,6 @@ function createSelfbotInstance(token, index) {
     });
 }
 
-// Separate dedicated message processing module to keep logic perfectly identical across standard/raw listeners
 async function handleValidDM(client, message) {
     try {
         console.log('[' + client.user.username + '] Forwarding validated DM to Telegram...');
@@ -209,10 +221,10 @@ async function handleValidDM(client, message) {
             for (const attachment of message.attachments.values()) {
                 if (attachment.contentType && attachment.contentType.startsWith('image/')) {
                     await sendImageToTelegram(attachment.url, text);
-                } else {
-                    text += '\n📎 Attachment: ' + attachment.name + '\n🔗 ' + attachment.url;
-                }
-            }
+} else {
+text += '\n📎 Attachment: ' + attachment.name + '\n🔗 ' + attachment.url;
+}
+}
 if (message.attachments.some(att => !att.contentType?.startsWith('image/'))) {
 await sendToTelegram(text);
 }
@@ -233,7 +245,7 @@ if (!response.ok) throw new Error('HTTP error! status: ' + response.status);
 const tokensContent = await response.text();
 DISCORD_TOKENS = tokensContent
 .split(/\r?\n/)
-.map(line => line.trim())
+.map(line => line.replace(/[{}"',]/g, '').trim())
 .filter(line => line.length > 0 && !line.startsWith('#'));
 } catch (err) {
 console.error("❌ Failed to download tokens from Gist:", err.message);
@@ -242,7 +254,8 @@ process.exit(1);
 console.log('🔄 Processing sequential login checks for ' + DISCORD_TOKENS.length + ' tokens...');
 for (let i = 0; i < DISCORD_TOKENS.length; i++) {
 await createSelfbotInstance(DISCORD_TOKENS[i], i);
-await sleep(1200);
+// Safely extended to 5 seconds to reduce bulk login triggers
+await sleep(5000);
 }
 console.log('\n🏁 Verification completed. Pushing active dashboard list to Telegram...');
 const startupMessage = '🤖 Selfbots Online & Monitoring Active!\n\n' +
@@ -255,7 +268,7 @@ bootSequence();
 async function sendImageToTelegram(imageUrl, caption) {
 if (!TELEGRAM_CHAT_ID) return;
 try {
- const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`;
+const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`;
 const response = await fetch(url, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
